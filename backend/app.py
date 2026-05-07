@@ -1,13 +1,32 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS
-import fitz  # PyMuPDF
 import re
-import spacy
-nlp = spacy.load("en_core_web_sm")
+from werkzeug.security import generate_password_hash, check_password_hash
+
+try:
+    import spacy
+except ImportError:
+    spacy = None
+
+try:
+    from flask_cors import CORS
+except ImportError:
+    CORS = None
+
+try:
+    nlp = spacy.load("en_core_web_sm") if spacy is not None else None
+except OSError:
+    nlp = None
+
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    fitz = None
+
 # Remove OpenAI imports and API key
 
 app = Flask(__name__)
-CORS(app)  # allow cross-origin requests
+if CORS is not None:
+    CORS(app)  # allow cross-origin requests
 
 # Predefined job role skills
 JOB_ROLE_SKILLS = {
@@ -133,10 +152,12 @@ LEARNING_RESOURCES = {
         {"label": "Figma Tutorial (freeCodeCamp, 2hr)", "url": "https://www.youtube.com/watch?v=jwCmIBJ8Jtc", "type": "Video", "minutes": 120}
     ],
     "Sketch": [
-        {"label": "Sketch App Tutorial (Envato Tuts+, 1hr)", "url": "https://www.youtube.com/watch?v=6cT4ZHlJt5M", "type": "Quick Start", "minutes": 60}
+        {"label": "Sketch App Tutorial (Envato Tuts+, 1hr)", "url": "https://www.youtube.com/watch?v=6cT4ZHlJt5M", "type": "Quick Start", "minutes": 60},
+        {"label": "Sketch Official Documentation", "url": "https://www.sketch.com/docs/", "type": "Docs", "minutes": 120}
     ],
     "Adobe XD": [
-        {"label": "Adobe XD Tutorial (Envato Tuts+, 1hr)", "url": "https://www.youtube.com/watch?v=68w2VwalD5w", "type": "Quick Start", "minutes": 60}
+        {"label": "Adobe XD Tutorial (Envato Tuts+, 1hr)", "url": "https://www.youtube.com/watch?v=68w2VwalD5w", "type": "Quick Start", "minutes": 60},
+        {"label": "Adobe XD Official Documentation", "url": "https://helpx.adobe.com/xd/tutorials.html", "type": "Docs", "minutes": 120}
     ],
     "Wireframing": [
         {"label": "Wireframing in Figma (CharliMarieTV, 30min)", "url": "https://www.youtube.com/watch?v=QH6RypFa5aA", "type": "Quick Start", "minutes": 30}
@@ -197,6 +218,8 @@ LEARNING_TIME_ESTIMATES = {
 
 # Utility: extract text from PDF
 def extract_text_from_pdf(file):
+    if fitz is None:
+        raise RuntimeError("PyMuPDF is not installed. Install the backend requirements to analyze PDF resumes.")
     text = ""
     with fitz.open(stream=file.read(), filetype="pdf") as doc:
         for page in doc:
@@ -206,20 +229,22 @@ def extract_text_from_pdf(file):
 # Utility: extract keywords from resume text (simplified)
 
 def extract_skills(text):
-    doc = nlp(text)
     all_skills = {skill.lower(): skill for skills in JOB_ROLE_SKILLS.values() for skill in skills}
     found_skills = set()
 
-    # Extract noun chunks and entities
-    for chunk in doc.noun_chunks:
-        chunk_text = chunk.text.lower().strip()
-        if chunk_text in all_skills:
-            found_skills.add(all_skills[chunk_text])
+    if nlp is not None:
+        doc = nlp(text)
 
-    for ent in doc.ents:
-        ent_text = ent.text.lower().strip()
-        if ent_text in all_skills:
-            found_skills.add(all_skills[ent_text])
+        # Extract noun chunks and entities when spaCy is available
+        for chunk in doc.noun_chunks:
+            chunk_text = chunk.text.lower().strip()
+            if chunk_text in all_skills:
+                found_skills.add(all_skills[chunk_text])
+
+        for ent in doc.ents:
+            ent_text = ent.text.lower().strip()
+            if ent_text in all_skills:
+                found_skills.add(all_skills[ent_text])
 
     # Also check for direct word matches (fallback)
     for skill in all_skills:
@@ -294,6 +319,8 @@ def analyze():
         })
 
     except Exception as e:
+        if str(e).startswith("PyMuPDF is not installed"):
+            return jsonify({'error': str(e)}), 500
         print("Error in /analyze:", str(e))
         return jsonify({'error': 'Something went wrong on server'}), 500
 
@@ -491,6 +518,45 @@ def chatbot():
         return jsonify({'answer': "If you're stuck, break the problem down, search for solutions, ask for help, and take breaks. Learning is about persistence!"})
     # Default fallback
     return jsonify({'answer': "I'm not sure how to answer that. Try asking about your skills, missing skills, learning resources, how to use the app, resume tips, or motivation!"})
+
+USERS = {}
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    data = request.get_json()
+    username = data.get('username')
+    email = data.get('email')  # NEW
+    password = data.get('password')
+    if not username or not password or not email:
+        return jsonify({'error': 'Username, email, and password required.'}), 400
+    if username in USERS:
+        return jsonify({'error': 'Username already exists.'}), 400
+    USERS[username] = {
+        'password': generate_password_hash(password),
+        'email': email
+    }
+    return jsonify({'message': 'Signup successful.'})
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({'error': 'Username and password required.'}), 400
+    user_hash = USERS.get(username)
+    if not user_hash or not check_password_hash(user_hash, password):
+        return jsonify({'error': 'Invalid credentials.'}), 401
+    return jsonify({'message': 'Login successful.'})
+
+@app.route('/profile', methods=['POST'])
+def profile():
+    data = request.get_json()
+    username = data.get('username')
+    user = USERS.get(username)
+    if not user:
+        return jsonify({'error': 'User not found.'}), 404
+    return jsonify({'username': username, 'email': user.get('email', '')})
 
 # Run app
 if __name__ == '__main__':

@@ -29,24 +29,24 @@ function Header() {
 
   return (
     <header
-      className={`fixed top-0 left-0 w-full z-50 flex items-center justify-between px-6 py-4 border-b transition-all duration-300
+      className={`fixed top-0 left-0 w-full z-50 flex items-center justify-between px-8 py-4 border-b transition-all duration-300
         ${scrolled
-          ? "bg-white/90 dark:bg-gray-900/90 shadow-lg backdrop-blur-md"
-          : "bg-white/60 dark:bg-gray-900/60 shadow-none backdrop-blur-none"
+          ? "bg-white/95 dark:bg-slate-950/95 shadow-md border-slate-200 dark:border-slate-800 backdrop-blur-md"
+          : "bg-white/80 dark:bg-slate-950/80 border-transparent backdrop-blur-none"
         }`}
     >
       <h1
-        className={`text-2xl font-bold text-blue-600 dark:text-blue-400 transition-all duration-500 origin-left
+        className={`text-xl font-bold tracking-tight text-slate-900 dark:text-white transition-all duration-500 origin-left
           ${scrolled ? "scale-90" : "scale-100"}
           ${logoVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-6"}
         `}
         style={{ willChange: 'transform, opacity' }}
       >
-        🚀 SkillPilot
+        SkillPilot
       </h1>
       <button
         onClick={() => setDarkMode(!darkMode)}
-        className="text-sm bg-gray-200 dark:bg-gray-700 px-3 py-1 rounded hover:opacity-80 text-gray-800 dark:text-white"
+        className="text-sm bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 transition"
       >
         {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
       </button>

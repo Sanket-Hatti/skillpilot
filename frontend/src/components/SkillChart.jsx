@@ -4,30 +4,37 @@ import {
 
 const SkillChart = ({ resumeSkills, jobSkills }) => {
   const resumeSet = new Set(resumeSkills.map(skill => skill.toLowerCase()));
-  const chartData = jobSkills.map(skill => ({
+  let chartData = jobSkills.map(skill => ({
     skill,
     Status: resumeSet.has(skill.toLowerCase()) ? "Matched" : "Missing",
     Value: 1,
   }));
 
+  // Sort by match status: Matched first, then Missing
+  chartData = chartData.sort((a, b) => {
+    if (a.Status === "Matched" && b.Status === "Missing") return -1;
+    if (a.Status === "Missing" && b.Status === "Matched") return 1;
+    return 0;
+  });
+
   const getBarColor = (status) =>
-    status === "Matched" ? "#2563eb" : "#f87171";
+    status === "Matched" ? "#14b8a6" : "#f59e0b";
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const { Status } = payload[0].payload;
       return (
-        <div className="rounded-xl shadow-lg p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-          <div className="font-semibold mb-1 text-gray-900 dark:text-gray-100">Skill: {label}</div>
+        <div className="rounded-xl shadow-lg p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+          <div className="font-semibold mb-1 text-slate-900 dark:text-slate-100">Skill: {label}</div>
           {Status === "Matched" ? (
             <div className="flex items-center gap-2">
-              <span className="font-medium text-blue-600 dark:text-blue-400">Matched:</span>
-              <span className="text-blue-600 dark:text-blue-400">You have this skill!</span>
+              <span className="font-medium text-teal-600 dark:text-teal-400">Matched:</span>
+              <span className="text-teal-600 dark:text-teal-400">You have this skill</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="font-medium text-red-600 dark:text-red-400">Missing:</span>
-              <span className="text-red-600 dark:text-red-400">You are missing this skill</span>
+              <span className="font-medium text-amber-600 dark:text-amber-400">Missing:</span>
+              <span className="text-amber-600 dark:text-amber-400">You need to learn this</span>
             </div>
           )}
         </div>
@@ -37,17 +44,17 @@ const SkillChart = ({ resumeSkills, jobSkills }) => {
   };
 
   return (
-    <div className="bg-white/80 dark:bg-gray-900/80 rounded-2xl shadow-xl p-8 mb-8 border border-gray-200 dark:border-gray-800">
+    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8">
       {/* Removed Skill Gap Overview heading for cleaner look */}
-      <div className="flex justify-center mb-4">
-        <div className="flex items-center gap-6">
+      <div className="flex justify-center mb-6">
+        <div className="flex items-center gap-8">
           <span className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-blue-600"></span>
-            <span className="text-blue-700 dark:text-blue-400 font-medium">Matched</span>
+            <span className="inline-block w-4 h-4 rounded-sm bg-teal-600"></span>
+            <span className="text-teal-700 dark:text-teal-400 font-semibold text-sm">Matched</span>
           </span>
           <span className="flex items-center gap-2">
-            <span className="inline-block w-3 h-3 rounded-full bg-red-400"></span>
-            <span className="text-red-600 dark:text-red-400 font-medium">Missing</span>
+            <span className="inline-block w-4 h-4 rounded-sm bg-amber-400"></span>
+            <span className="text-amber-600 dark:text-amber-400 font-semibold text-sm">Missing</span>
           </span>
         </div>
       </div>
@@ -58,12 +65,12 @@ const SkillChart = ({ resumeSkills, jobSkills }) => {
           margin={{ top: 10, right: 40, left: 80, bottom: 10 }}
           barCategoryGap={24}
         >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" />
           <XAxis type="number" domain={[0, 1]} hide />
           <YAxis
             dataKey="skill"
             type="category"
-            tick={{ fontSize: 16, fill: "#334155", fontWeight: 600 }}
+            tick={{ fontSize: 14, fill: "#475569", fontWeight: 500 }}
             width={120}
           />
           <Tooltip content={<CustomTooltip />} />
