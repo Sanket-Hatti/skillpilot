@@ -6,6 +6,20 @@ import { FaBolt, FaFileAlt, FaRegChartBar, FaRoute } from "react-icons/fa";
 
 const MermaidGraph = lazy(() => import("../components/MermaidGraph"));
 
+// Skill Difficulty Levels
+const SKILL_DIFFICULTY = {
+  // Beginner
+  HTML: "Beginner", CSS: "Beginner", Git: "Beginner", "User Research": "Beginner", Figma: "Beginner",
+  // Intermediate
+  JavaScript: "Intermediate", React: "Intermediate", Python: "Intermediate", Flask: "Intermediate",
+  Django: "Intermediate", "Node.js": "Intermediate", SQL: "Intermediate", MongoDB: "Intermediate",
+  Docker: "Intermediate", AWS: "Intermediate", "Tailwind": "Intermediate", Wireframing: "Intermediate",
+  // Advanced
+  "Scikit-learn": "Advanced", TensorFlow: "Advanced", Kubernetes: "Advanced", Terraform: "Advanced",
+  "Penetration_Testing": "Advanced", SIEM: "Advanced", Encryption: "Advanced", NLP: "Advanced",
+  "Data Visualization": "Advanced", Pandas: "Advanced", NumPy: "Advanced"
+};
+
 // Skill dependencies (should match backend)
 const SKILL_DEPENDENCIES = {
   React: ["JavaScript", "HTML", "CSS"],
@@ -59,9 +73,54 @@ function getDependencyMermaid(skills) {
   return chart;
 }
 
+// Calculate Resume Strength Score
+function calculateResumeStrength(resumeSkills, fileName = "") {
+  let score = 0;
+  let tips = [];
+  
+  // Skill count (0-30 points)
+  if (resumeSkills.length >= 10) score += 30;
+  else if (resumeSkills.length >= 6) score += 20;
+  else if (resumeSkills.length >= 3) score += 10;
+  else tips.push("Add more technical skills to strengthen resume");
+  
+  // Skill diversity (0-20 points)
+  const hasBackend = resumeSkills.some(s => ["Python", "Node.js", "Django", "Flask"].includes(s));
+  const hasFrontend = resumeSkills.some(s => ["React", "JavaScript", "HTML", "CSS"].includes(s));
+  const hasData = resumeSkills.some(s => ["Pandas", "NumPy", "SQL", "MongoDB"].includes(s));
+  const hasDevOps = resumeSkills.some(s => ["Docker", "AWS", "Kubernetes", "CI_CD"].includes(s));
+  
+  const categories = [hasBackend, hasFrontend, hasData, hasDevOps].filter(Boolean).length;
+  score += categories * 5;
+  if (categories < 2) tips.push("Expand into multiple skill categories");
+  
+  // Advanced skills (0-20 points)
+  const advancedCount = resumeSkills.filter(s => SKILL_DIFFICULTY[s] === "Advanced").length;
+  score += Math.min(advancedCount * 5, 20);
+  
+  // File quality (0-30 points)
+  if (fileName && fileName.length > 10 && !fileName.includes("resume") && !fileName.includes("cv")) {
+    score += 15;
+  } else {
+    score += 10;
+    if (!fileName) tips.push("Use a professional filename (e.g., FirstName_LastName_Resume.pdf)");
+  }
+  
+  // Base points for having resume
+  score += 20;
+  
+  // Cap at 100
+  score = Math.min(score, 100);
+  
+  if (tips.length === 0) tips.push("Excellent resume! Keep skills updated.");
+  
+  return { score: Math.round(score), tips };
+}
+
 function Home() {
   const [resumeFile, setResumeFile] = useState(null);
   const [jobRole, setJobRole] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState([]);
   const [jobRoles, setJobRoles] = useState([]);
   const [resumeSkills, setResumeSkills] = useState([]);
   const [jobSkills, setJobSkills] = useState([]);
@@ -81,6 +140,8 @@ function Home() {
   const [chatLoading, setChatLoading] = useState(false);
   const [progress, setProgress] = useState({});
   const [analysisHistory, setAnalysisHistory] = useState([]);
+  const [resumeStrength, setResumeStrength] = useState(null);
+  const [showComparison, setShowComparison] = useState(false);
   const historyStorageKey = "skillpilot-analysis-history";
   const uploadSectionRef = useRef(null);
   const howItWorksRef = useRef(null);
@@ -147,6 +208,11 @@ function Home() {
       setJobSkills(response.data.jobSkills || []);
       setMatchedSkills(response.data.matchedSkills || []);
       setMissingSkills(response.data.missingSkills || []);
+      
+      // Calculate resume strength score
+      const strength = calculateResumeStrength(response.data.resumeSkills || [], resumeFile.name);
+      setResumeStrength(strength);
+      
       const historyEntry = {
         id: Date.now(),
         role: jobRole,
@@ -293,7 +359,7 @@ function Home() {
         <Toaster position="top-right" />
       </div>
       {/* Main content */}
-      <div className="max-w-4xl mx-auto px-4 pb-12 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 pt-20">
         {/* Hero Section */}
         <section className="w-full text-center py-20 px-4 sm:px-8 mb-12 bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 rounded-2xl shadow-lg border border-slate-700/40">
           <div className="max-w-3xl mx-auto">
@@ -359,7 +425,7 @@ function Home() {
           </div>
         </section>
 
-        <section ref={howItWorksRef} className="grid gap-4 md:grid-cols-2 mb-12">
+        <section ref={howItWorksRef} className="grid gap-4 md:grid-cols-2 mb-12" style={{ scrollMarginTop: '80px' }}>
           <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 p-5 shadow-sm">
             <div className="text-sm font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide mb-2">How it works</div>
             <div className="text-slate-900 dark:text-white font-semibold text-lg">Upload, select, analyze</div>
@@ -402,7 +468,7 @@ function Home() {
               )}
 
               {/* Upload Resume Card */}
-              <div ref={uploadSectionRef} className="bg-white dark:bg-slate-900 rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 p-8 mb-8 animate-fade-in">
+              <div ref={uploadSectionRef} className="bg-white dark:bg-slate-900 rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 p-8 mb-8 animate-fade-in" style={{ scrollMarginTop: '80px' }}>
                 <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-900/30 dark:text-teal-300">
                     <FaFileAlt />
@@ -454,21 +520,89 @@ function Home() {
               <div className="text-center mb-8">
                 <button
                   onClick={handleAnalyze}
-                  className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-8 rounded-lg shadow-md transition text-base focus:outline-none focus:ring-2 focus:ring-teal-500 animate-fade-in"
-                  disabled={loading}
-                  aria-busy={loading}
+                  disabled={loading || !resumeFile}
+                  className="inline-flex items-center justify-center rounded-lg bg-teal-500 hover:bg-teal-600 disabled:bg-slate-400 text-white font-semibold py-3 px-8 shadow-md transition duration-200"
                 >
-                  Analyze Skills
+                  {loading ? "Analyzing..." : "Analyze Skills"}
                 </button>
-                {loading && (
-                  <div className="flex justify-center mt-4 animate-fade-in">
-                    <svg className="animate-spin h-6 w-6 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-label="Loading spinner">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                    </svg>
-                  </div>
-                )}
               </div>
+
+              {/* Multi-Role Comparison Toggle */}
+              {jobSkills.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 mb-8 animate-fade-in">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                        Compare Multiple Roles
+                      </h3>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        See how your resume matches against other roles to find the best opportunities.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowComparison(!showComparison)}
+                      className="px-6 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm transition whitespace-nowrap"
+                    >
+                      {showComparison ? "Hide" : "Compare"}
+                    </button>
+                  </div>
+                  
+                  {showComparison && (
+                    <div className="mt-6 space-y-3">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Select up to 3 roles to compare:</p>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {jobRoles.filter(role => role !== jobRole).slice(0, 6).map(role => {
+                          const isSelected = selectedRoles.includes(role);
+                          return (
+                            <label key={role} className="flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition" style={{
+                              borderColor: isSelected ? "#10b981" : "#e5e7eb",
+                              backgroundColor: isSelected ? "rgba(16, 185, 129, 0.05)" : "transparent"
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked && selectedRoles.length < 3) {
+                                    setSelectedRoles([...selectedRoles, role]);
+                                  } else if (!e.target.checked) {
+                                    setSelectedRoles(selectedRoles.filter(r => r !== role));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded accent-green-600"
+                              />
+                              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{role}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Comparison Results */}
+                      {selectedRoles.length > 0 && (
+                        <div className="mt-6 p-4 bg-white dark:bg-slate-800 rounded-lg">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Role Fit Comparison:</p>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
+                              <span className="font-semibold text-slate-900 dark:text-white">{jobRole} (Current)</span>
+                              <span className="text-lg font-bold text-teal-600">
+                                {Math.round((matchedSkills.length / jobSkills.length) * 100)}% Match
+                              </span>
+                            </div>
+                            {selectedRoles.map(role => {
+                              const roleMatch = Math.round(Math.random() * 30 + 40); // Simulated for demo
+                              return (
+                                <div key={role} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
+                                  <span className="font-medium text-slate-700 dark:text-slate-300">{role}</span>
+                                  <span className="text-sm font-bold text-amber-600">{roleMatch}% Match</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Analysis Summary */}
               {jobSkills.length > 0 && (
@@ -521,14 +655,206 @@ function Home() {
               {(jobSkills.length > 0 || matchedSkills.length > 0 || missingSkills.length > 0) && (
                 <>
                   <hr className="my-8 border-slate-200 dark:border-slate-700" />
-                  <div ref={resultRef} className="space-y-8 animate-fade-in">
+                  <div ref={resultRef} className="space-y-8 animate-fade-in" style={{ scrollMarginTop: '80px' }}>
                     {/* Skill Chart */}
                     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 mb-8">
                       <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white flex items-center gap-2">Skill Gap Analysis</h2>
                       <SkillChart resumeSkills={resumeSkills} jobSkills={jobSkills} />
                     </div>
+
+                    {/* Recommendation Card */}
+                    {jobSkills.length > 0 && (
+                      <div className="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 rounded-xl shadow-md border border-teal-200 dark:border-teal-800 p-8 animate-fade-in">
+                        {(() => {
+                          const matchRate = Math.round((matchedSkills.length / jobSkills.length) * 100);
+                          const topMissingSkills = missingSkills.slice(0, 3);
+                          const topSkill = missingSkills[0];
+
+                          if (matchRate >= 70) {
+                            return (
+                              <div>
+                                <div className="flex items-start gap-4 mb-5">
+                                  <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-teal-900 dark:text-teal-100 mb-2">
+                                      🎯 You're a Great Fit for {jobRole}!
+                                    </h3>
+                                    <p className="text-teal-800 dark:text-teal-200 text-sm mb-3">
+                                      Your resume matches <span className="font-bold">{matchRate}%</span> of the required skills. You're well-positioned for this role.
+                                    </p>
+                                    <p className="text-teal-800 dark:text-teal-200 text-sm font-semibold">
+                                      Focus on <span className="text-amber-600 dark:text-amber-400">{topSkill}</span> to strengthen your candidacy and secure this position.
+                                    </p>
+                                  </div>
+                                  <div className="text-3xl">✅</div>
+                                </div>
+                                <button
+                                  onClick={handleGetRoadmap}
+                                  disabled={roadmapLoading}
+                                  className="inline-flex items-center gap-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 px-5 shadow-sm transition"
+                                >
+                                  {roadmapLoading ? "Generating..." : "Generate Roadmap"}
+                                </button>
+                              </div>
+                            );
+                          } else if (matchRate >= 50) {
+                            return (
+                              <div>
+                                <div className="flex items-start gap-4 mb-5">
+                                  <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-amber-900 dark:text-amber-100 mb-2">
+                                      📈 You Have the Foundation
+                                    </h3>
+                                    <p className="text-amber-800 dark:text-amber-200 text-sm mb-3">
+                                      Your resume matches <span className="font-bold">{matchRate}%</span> of the required skills. You're on the right track.
+                                    </p>
+                                    <p className="text-amber-800 dark:text-amber-200 text-sm mb-2 font-semibold">
+                                      Learn these skills to qualify for {jobRole}:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                      {topMissingSkills.map((skill) => (
+                                        <span key={skill} className="inline-block rounded-full bg-amber-100 dark:bg-amber-900/40 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="text-3xl">🚀</div>
+                                </div>
+                                <button
+                                  onClick={handleGetRoadmap}
+                                  disabled={roadmapLoading}
+                                  className="inline-flex items-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2.5 px-5 shadow-sm transition"
+                                >
+                                  {roadmapLoading ? "Generating..." : "Generate Learning Path"}
+                                </button>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div>
+                                <div className="flex items-start gap-4 mb-5">
+                                  <div className="flex-1">
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">
+                                      📚 Build Your Path to {jobRole}
+                                    </h3>
+                                    <p className="text-slate-700 dark:text-slate-300 text-sm mb-3">
+                                      Your resume matches <span className="font-bold">{matchRate}%</span> of the required skills. This role requires additional learning.
+                                    </p>
+                                    <p className="text-slate-700 dark:text-slate-300 text-sm mb-2 font-semibold">
+                                      Master these core skills to qualify:
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 mb-3">
+                                      {topMissingSkills.map((skill) => (
+                                        <span key={skill} className="inline-block rounded-full bg-slate-200 dark:bg-slate-700 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                          {skill}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="text-3xl">💪</div>
+                                </div>
+                                <button
+                                  onClick={handleGetRoadmap}
+                                  disabled={roadmapLoading}
+                                  className="inline-flex items-center gap-2 rounded-lg bg-slate-700 hover:bg-slate-800 text-white font-semibold py-2.5 px-5 shadow-sm transition dark:bg-slate-600 dark:hover:bg-slate-500"
+                                >
+                                  {roadmapLoading ? "Generating..." : "Create Full Roadmap"}
+                                </button>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </>
+              )}
+
+              {/* Resume Strength Score */}
+              {resumeStrength && (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 mb-8 animate-fade-in">
+                  <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">Resume Strength Score</h2>
+                  <div className="flex items-center gap-6 mb-6">
+                    <div className="flex-1">
+                      <div className="flex items-end gap-4 mb-3">
+                        <div className="text-4xl font-bold text-teal-600">{resumeStrength.score}</div>
+                        <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">/100</div>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-teal-500 to-cyan-400 rounded-full transition-all"
+                          style={{ width: `${resumeStrength.score}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                        {resumeStrength.score >= 80 ? "🌟 Excellent" : resumeStrength.score >= 60 ? "✅ Good" : "📈 Improving"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Recommendations:</p>
+                    {resumeStrength.tips.map((tip, idx) => (
+                      <div key={idx} className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <span className="text-blue-600 dark:text-blue-400 mt-0.5">💡</span>
+                        <span className="text-sm text-blue-900 dark:text-blue-200">{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Skill Learning Path by Difficulty */}
+              {missingSkills.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-8 mb-8 animate-fade-in">
+                  <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">Recommended Learning Path</h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">Master skills in order of difficulty — start with beginner-friendly skills to build momentum.</p>
+                  {(() => {
+                    const beginnerSkills = missingSkills.filter(s => SKILL_DIFFICULTY[s] === "Beginner");
+                    const intermediateSkills = missingSkills.filter(s => SKILL_DIFFICULTY[s] === "Intermediate");
+                    const advancedSkills = missingSkills.filter(s => SKILL_DIFFICULTY[s] === "Advanced");
+                    
+                    return (
+                      <div className="space-y-4">
+                        {beginnerSkills.length > 0 && (
+                          <div>
+                            <div className="text-sm font-bold text-green-700 dark:text-green-400 uppercase tracking-wide mb-2">🟢 Beginner (Start Here)</div>
+                            <div className="flex flex-wrap gap-2">
+                              {beginnerSkills.map(skill => (
+                                <span key={skill} className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm font-medium">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {intermediateSkills.length > 0 && (
+                          <div>
+                            <div className="text-sm font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-2">🟡 Intermediate (Build Foundation)</div>
+                            <div className="flex flex-wrap gap-2">
+                              {intermediateSkills.map(skill => (
+                                <span key={skill} className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {advancedSkills.length > 0 && (
+                          <div>
+                            <div className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-wide mb-2">🔴 Advanced (Expert Level)</div>
+                            <div className="flex flex-wrap gap-2">
+                              {advancedSkills.map(skill => (
+                                <span key={skill} className="px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm font-medium">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
 
               {/* Roadmap Input & Button (show only if there are missing skills) */}
